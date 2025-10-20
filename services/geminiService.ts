@@ -1,9 +1,7 @@
 import { GoogleGenAI, Content, Part, Modality } from "@google/genai";
 import { ChatMessage, AIModelOption } from "../types";
 
-const GEMINI_API_KEY = process.env.API_KEY;
-// Conditionally initialize to prevent crashes if the key is missing. The App component will show an error screen.
-const ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const OPENROUTER_API_KEY = "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";
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -58,9 +56,6 @@ const callOpenRouter = async (model: string, systemPrompt: string, history: Chat
 };
 
 const callGemini = async (systemPrompt: string, history: ChatMessage[]) => {
-    if (!ai) {
-        throw new Error("Gemini API key is not configured. Cannot use Gemini fallback.");
-    }
     const model = 'gemini-flash-lite-latest'; // Free model for fallback
     const contents: Content[] = history.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model',
@@ -120,10 +115,6 @@ export const generateUserResponseSuggestion = (
 
 
 export async function generateDynamicDescription(personality: string): Promise<string> {
-  if (!ai) {
-    console.warn("Gemini API key not configured. Using fallback description.");
-    return "I'm ready to chat."; // Fallback description
-  }
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -138,10 +129,6 @@ export async function generateDynamicDescription(personality: string): Promise<s
 }
 
 export async function generateImage(prompt: string, sourceImage: string | null): Promise<string> {
-  if (!ai) {
-    throw new Error("Gemini API key is not configured. Cannot generate image.");
-  }
-
   const model = 'gemini-2.5-flash-image';
   const parts: Part[] = [{ text: `Instruction: Preserve the facial structure and identity of the person in the source image. ${prompt}` }];
 

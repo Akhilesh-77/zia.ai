@@ -11,21 +11,6 @@ import type { BotProfile, Persona, ChatMessage, AIModelOption, VoicePreference }
 
 export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat';
 
-const ApiKeyWarningBanner: React.FC<{onDismiss: () => void}> = ({onDismiss}) => (
-  <div className="absolute top-0 left-0 right-0 bg-yellow-500/90 text-black p-3 text-center text-sm z-50 flex items-center justify-center gap-4 animate-fadeIn">
-    <div>
-        <p>
-            <strong className="font-bold">Configuration Required:</strong> The <code className="bg-black/20 px-1 rounded">API_KEY</code> environment variable is missing.
-        </p>
-        <p className="text-xs mt-1">
-            Please add it to your hosting provider's settings (e.g., AWS Amplify) to enable all AI features. The app is in limited mode.
-        </p>
-    </div>
-    <button onClick={onDismiss} className="p-1 rounded-full hover:bg-black/20">&times;</button>
-  </div>
-);
-
-
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [bots, setBots] = useState<BotProfile[]>([]);
@@ -38,15 +23,9 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedAI, setSelectedAI] = useState<AIModelOption>('gemini');
   const [voicePreference, setVoicePreference] = useState<VoicePreference | null>(null);
-  const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
 
   // Load data from localStorage on initial render
   useEffect(() => {
-    // Check for API key and show warning if missing.
-    if (!process.env.API_KEY) {
-        setShowApiKeyWarning(true);
-    }
-
     try {
       const savedBots = localStorage.getItem('bots');
       if (savedBots) setBots(JSON.parse(savedBots));
@@ -253,7 +232,6 @@ const App: React.FC = () => {
 
   return (
     <div className={`w-full h-full max-w-md mx-auto flex flex-col font-sans shadow-2xl overflow-hidden relative ${theme}`}>
-      {showApiKeyWarning && <ApiKeyWarningBanner onDismiss={() => setShowApiKeyWarning(false)} />}
       <SettingsPanel 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
