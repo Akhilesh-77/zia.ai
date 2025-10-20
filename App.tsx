@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
 import BotsPage from './components/BotsPage';
@@ -12,27 +11,15 @@ import type { BotProfile, Persona, ChatMessage, AIModelOption, VoicePreference }
 
 export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat';
 
-const ApiKeyErrorScreen: React.FC = () => (
-  <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-red-900/80 text-white">
-    <div className="bg-red-800/50 p-8 rounded-2xl shadow-2xl backdrop-blur-sm border border-red-500/50">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-      <h1 className="text-3xl font-bold mb-4">Configuration Error</h1>
-      <p className="text-lg mb-2">The Gemini API key is missing.</p>
-      <p className="max-w-md mx-auto text-red-200">
-        This application cannot connect to the AI services because the required 
-        <code className="bg-red-900/80 text-yellow-300 px-2 py-1 rounded-md mx-1 font-mono">API_KEY</code> 
-        environment variable has not been set in the deployment environment.
-      </p>
-      <div className="mt-6 text-left bg-black/20 p-4 rounded-lg max-w-md mx-auto">
-          <p className="font-bold mb-2">How to fix:</p>
-          <p className="text-sm">
-            If you are the administrator, please add the <code className="font-mono text-yellow-300">API_KEY</code> to your hosting provider's 
-            (e.g., AWS Amplify, Vercel) environment variables and redeploy the application.
-          </p>
-      </div>
+const ApiKeyWarningBanner: React.FC<{onDismiss: () => void}> = ({onDismiss}) => (
+  <div className="absolute top-0 left-0 right-0 bg-yellow-500/90 text-black p-3 text-center text-sm z-50 flex items-center justify-center gap-4 animate-fadeIn">
+    <div>
+        <p>
+            <strong className="font-bold">Warning:</strong> The Gemini <code className="bg-black/20 px-1 rounded">API_KEY</code> is not set. 
+            Image generation and some AI features may be unavailable. The app is using fallback models.
+        </p>
     </div>
+    <button onClick={onDismiss} className="p-1 rounded-full hover:bg-black/20">&times;</button>
   </div>
 );
 
@@ -49,14 +36,15 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedAI, setSelectedAI] = useState<AIModelOption>('gemini');
   const [voicePreference, setVoicePreference] = useState<VoicePreference | null>(null);
-
-  // Check for the API key. This is the primary fix for the blank screen issue.
-  if (!process.env.API_KEY) {
-    return <ApiKeyErrorScreen />;
-  }
+  const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
 
   // Load data from localStorage on initial render
   useEffect(() => {
+    // Check for API key and show warning if missing.
+    if (!process.env.API_KEY) {
+        setShowApiKeyWarning(true);
+    }
+
     try {
       const savedBots = localStorage.getItem('bots');
       if (savedBots) setBots(JSON.parse(savedBots));
@@ -263,6 +251,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`w-full h-full max-w-md mx-auto flex flex-col font-sans shadow-2xl overflow-hidden relative ${theme}`}>
+      {showApiKeyWarning && <ApiKeyWarningBanner onDismiss={() => setShowApiKeyWarning(false)} />}
       <SettingsPanel 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 

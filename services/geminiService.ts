@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Content, Part, Modality } from "@google/genai";
 import { ChatMessage, AIModelOption } from "../types";
 
@@ -12,8 +11,8 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 // --- Model Mapping ---
 const modelMap: Record<Exclude<AIModelOption, 'gemini'>, string> = {
     zia: 'deepseek/deepseek-chat', 
-    deepseek: 'deepseek/deepseek-chat',
-    qwen: 'qwen/qwen-2-7b-instruct:free',
+    deepseek: 'deepseek/deepseek-chat-v3.1:free',
+    qwen: 'qwen/qwen3-coder:free',
 };
 
 // Helper to convert base64 to a Part for multimodal input
@@ -60,7 +59,7 @@ const callOpenRouter = async (model: string, systemPrompt: string, history: Chat
 
 const callGemini = async (systemPrompt: string, history: ChatMessage[]) => {
     if (!ai) {
-        throw new Error("Gemini API key is not configured.");
+        throw new Error("Gemini API key is not configured. Cannot use Gemini fallback.");
     }
     const model = 'gemini-flash-lite-latest'; // Free model for fallback
     const contents: Content[] = history.map(msg => ({
@@ -90,11 +89,17 @@ async function generateTextWithFallback(
             return await callOpenRouter(modelMap[selectedAI], systemPrompt, history);
         } catch (error) {
             console.warn(`OpenRouter model '${selectedAI}' failed:`, error, "Falling back to Gemini.");
+            // Fall through to Gemini if OpenRouter fails
         }
     }
     
-    console.log("Generating text with Gemini fallback.");
-    return await callGemini(systemPrompt, history);
+    console.log("Generating text with Gemini.");
+    try {
+        return await callGemini(systemPrompt, history);
+    } catch (geminiError) {
+        console.error("Gemini fallback also failed:", geminiError);
+        return "Sorry, I'm having trouble connecting to my AI services right now. Please try again later.";
+    }
 }
 
 export const generateBotResponse = (
@@ -127,7 +132,8 @@ export async function generateDynamicDescription(personality: string): Promise<s
     return response.text.trim().replace(/"/g, '');
   } catch (error) {
     console.error("Error generating dynamic description:", error);
-    return "I'm ready to chat."; // Fallback description
+    // Graceful fallback to static description if API fails
+    return "I'm ready to chat.";
   }
 }
 
