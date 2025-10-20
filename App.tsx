@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
 import BotsPage from './components/BotsPage';
@@ -7,7 +8,7 @@ import PersonasPage from './components/PersonasPage';
 import ImageGeneratorPage from './components/ImageGeneratorPage';
 import FooterNav from './components/FooterNav';
 import SettingsPanel from './components/SettingsPanel';
-import type { BotProfile, Persona, ChatMessage, AIModelOption } from './types';
+import type { BotProfile, Persona, ChatMessage, AIModelOption, VoicePreference } from './types';
 
 export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat';
 
@@ -22,6 +23,8 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedAI, setSelectedAI] = useState<AIModelOption>('gemini');
+  const [voicePreference, setVoicePreference] = useState<VoicePreference | null>(null);
+
 
   // Load data from localStorage on initial render
   useEffect(() => {
@@ -50,6 +53,12 @@ const App: React.FC = () => {
       if (savedAI && ['gemini', 'zia', 'deepseek', 'qwen'].includes(savedAI)) {
           setSelectedAI(savedAI as AIModelOption);
       }
+      
+      const savedVoice = localStorage.getItem('voicePreference');
+      if (savedVoice && ['male', 'female'].includes(savedVoice)) {
+          setVoicePreference(savedVoice as VoicePreference);
+      }
+
 
     } catch (error) {
         console.error("Failed to load data from localStorage", error);
@@ -65,6 +74,7 @@ const App: React.FC = () => {
         localStorage.setItem('botUsage', JSON.stringify(botUsage));
         localStorage.setItem('theme', theme);
         localStorage.setItem('selectedAI', selectedAI);
+        if(voicePreference) localStorage.setItem('voicePreference', voicePreference);
 
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -74,7 +84,7 @@ const App: React.FC = () => {
     } catch (error) {
         console.error("Failed to save data to localStorage", error);
     }
-  }, [bots, personas, chatHistories, botUsage, theme, selectedAI]);
+  }, [bots, personas, chatHistories, botUsage, theme, selectedAI, voicePreference]);
 
   const handleNavigate = (page: Page) => {
     if (page === 'create') {
@@ -212,6 +222,7 @@ const App: React.FC = () => {
                     onNewMessage={(message) => handleNewMessage(effectiveBot.id, message)}
                     onUpdateHistory={(newHistory) => handleUpdateHistory(effectiveBot.id, newHistory)}
                     selectedAI={selectedAI}
+                    voicePreference={voicePreference}
                  />;
         }
         setCurrentPage('home');
@@ -231,6 +242,8 @@ const App: React.FC = () => {
         onClearData={handleClearData}
         selectedAI={selectedAI}
         onSelectAI={setSelectedAI}
+        voicePreference={voicePreference}
+        onSetVoicePreference={setVoicePreference}
       />
       <div className="flex-1 overflow-hidden">
         {renderPage()}

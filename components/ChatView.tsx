@@ -1,7 +1,19 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { BotProfile, ChatMessage, Persona, AIModelOption } from '../types';
+
+import React, { useState, useEffect, useRef } from 'react';
+import type { BotProfile, ChatMessage, Persona, AIModelOption, VoicePreference } from '../types';
 import { generateBotResponse, generateUserResponseSuggestion } from '../services/geminiService';
 import { xyz } from '../services/xyz';
+
+const PhotoViewer: React.FC<{ src: string; onClose: () => void }> = ({ src, onClose }) => (
+    <div
+        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fadeIn"
+        onClick={onClose}
+    >
+        <img src={src} alt="Full view" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+        <button onClick={onClose} className="absolute top-5 right-5 bg-black/50 text-white rounded-full h-10 w-10 flex items-center justify-center font-bold text-2xl">&times;</button>
+    </div>
+);
+
 
 interface ChatViewProps {
   bot: BotProfile & { persona?: Persona | null };
@@ -10,17 +22,36 @@ interface ChatViewProps {
   onNewMessage: (message: ChatMessage) => void;
   onUpdateHistory: (newHistory: ChatMessage[]) => void;
   selectedAI: AIModelOption;
+  voicePreference: VoicePreference | null;
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMessage, onUpdateHistory, selectedAI }) => {
+const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMessage, onUpdateHistory, selectedAI, voicePreference }) => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [photoToView, setPhotoToView] = useState<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
   
+  useEffect(() => {
+    const loadVoices = () => {
+        const availableVoices = window.speechSynthesis.getVoices();
+        if(availableVoices.length > 0) {
+            setVoices(availableVoices);
+        }
+    };
+    loadVoices();
+    // Voices might load asynchronously.
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    return () => {
+        window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   useEffect(() => {
     if (chatHistory.length === 0 && bot.scenario) {
       const scenarioMessage: ChatMessage = {
@@ -32,6 +63,21 @@ const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMess
       onNewMessage(scenarioMessage);
     }
   }, []);
+
+  const handlePlayVoice = (text: string) => {
+    window.speechSynthesis.cancel(); // Stop any currently playing speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    if (voicePreference && voices.length > 0) {
+        const desiredVoice = voices.find(voice =>
+            voice.name.toLowerCase().includes(voicePreference) ||
+            (voicePreference === 'female' && voice.name.toLowerCase().includes('female')) ||
+            (voicePreference === 'male' && voice.name.toLowerCase().includes('male'))
+        );
+        utterance.voice = desiredVoice || voices[0];
+    }
+    window.speechSynthesis.speak(utterance);
+  };
+
 
   const handleSend = async (messageText: string) => {
     if (!messageText.trim()) return;
@@ -123,6 +169,7 @@ const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMess
 
   return (
     <div className="h-full w-full flex flex-col bg-light-bg text-light-text dark:bg-dark-bg dark:text-dark-text relative">
+        {photoToView && <PhotoViewer src={photoToView} onClose={() => setPhotoToView(null)} />}
         {bot.chatBackground && (
             <div style={{backgroundImage: `url(${bot.chatBackground})`}} className="absolute inset-0 w-full h-full bg-cover bg-center z-0" >
                 <div className="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm"></div>
@@ -132,17 +179,16 @@ const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMess
         <button onClick={onBack} className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-black/20">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        <img src={bot.photo} alt={bot.name} className="h-10 w-10 rounded-full object-cover ml-4" />
+        <img src={bot.photo} alt={bot.name} className="h-10 w-10 rounded-full object-cover ml-4 cursor-pointer" onClick={() => setPhotoToView(bot.photo)} />
         <div className="ml-3">
           <h2 className="font-bold">{bot.name}</h2>
-          <p className="text-xs text-gray-400">{bot.description}</p>
         </div>
       </header>
       
       <main className="flex-1 overflow-y-auto p-4 space-y-1 z-10">
         {chatHistory.map((msg) => (
           <div key={msg.id} className={`flex items-end gap-2 group ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.sender === 'bot' && <img src={bot.photo} alt={bot.name} className="h-8 w-8 rounded-full object-cover self-start" />}
+            {msg.sender === 'bot' && <img src={bot.photo} alt={bot.name} className="h-8 w-8 rounded-full object-cover self-start cursor-pointer" onClick={() => setPhotoToView(bot.photo)} />}
             
             <div className={`flex items-center gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-accent text-white rounded-br-none' : 'bg-white/10 dark:bg-black/20 rounded-bl-none'}`}>
@@ -150,12 +196,13 @@ const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMess
                 </div>
                 {msg.sender === 'bot' && (
                     <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handlePlayVoice(msg.text)} className="p-1 rounded-full bg-black/30 hover:bg-accent"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg></button>
                         <button onClick={() => handleRegenerateMessage(msg.id)} className="p-1 rounded-full bg-black/30 hover:bg-accent"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 15M20 20l-1.5-1.5A9 9 0 013.5 9" /></svg></button>
                         <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 rounded-full bg-black/30 hover:bg-red-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                     </div>
                 )}
             </div>
-             {msg.sender === 'bot' && bot.persona?.photo && <img src={bot.persona.photo} alt={bot.persona.name} className="h-8 w-8 rounded-full object-cover self-start" />}
+             {msg.sender === 'bot' && bot.persona?.photo && <img src={bot.persona.photo} alt={bot.persona.name} className="h-8 w-8 rounded-full object-cover self-start cursor-pointer" onClick={() => bot.persona?.photo && setPhotoToView(bot.persona.photo)} />}
           </div>
         ))}
         {isTyping && (

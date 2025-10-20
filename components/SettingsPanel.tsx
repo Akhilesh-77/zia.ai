@@ -1,5 +1,6 @@
+
 import React from 'react';
-import type { AIModelOption } from '../types';
+import type { AIModelOption, VoicePreference } from '../types';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ interface SettingsPanelProps {
   onClearData: () => void;
   selectedAI: AIModelOption;
   onSelectAI: (model: AIModelOption) => void;
+  voicePreference: VoicePreference | null;
+  onSetVoicePreference: (voice: VoicePreference) => void;
 }
 
 const aiModelOptions: { id: AIModelOption, name: string }[] = [
@@ -18,7 +21,7 @@ const aiModelOptions: { id: AIModelOption, name: string }[] = [
     { id: 'qwen', name: 'Qwen' },
 ];
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, toggleTheme, onClearData, selectedAI, onSelectAI }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, toggleTheme, onClearData, selectedAI, onSelectAI, voicePreference, onSetVoicePreference }) => {
   return (
     <>
       <div 
@@ -44,6 +47,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, t
                     </button>
                 </div>
                 
+                 <div className="bg-white/5 dark:bg-black/10 p-4 rounded-xl">
+                    <p className="font-medium mb-2">Voice Preference</p>
+                    <p className="text-xs text-gray-400 mb-3">Select the default voice for text-to-speech.</p>
+                    <div className="flex gap-2">
+                        <button onClick={() => onSetVoicePreference('female')} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${voicePreference === 'female' ? 'bg-accent text-white' : 'bg-black/20'}`}>Female</button>
+                        <button onClick={() => onSetVoicePreference('male')} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${voicePreference === 'male' ? 'bg-accent text-white' : 'bg-black/20'}`}>Male</button>
+                    </div>
+                </div>
+
                 <div className="bg-white/5 dark:bg-black/10 p-4 rounded-xl">
                     <p className="font-medium mb-2">AI Model</p>
                     <p className="text-xs text-gray-400 mb-3">Select the AI model for chat responses. Other models use the OpenRouter API.</p>
@@ -77,7 +89,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, t
             </div>
 
             <div className="mt-auto text-center text-xs text-gray-500">
-                <p>Zia.ai v1.1.0</p>
+                <p>Zia.ai v1.2.0</p>
                 <p>Powered by OpenRouter & Google Gemini</p>
             </div>
         </div>

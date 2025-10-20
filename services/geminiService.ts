@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Content, Part, Modality } from "@google/genai";
 import { ChatMessage, AIModelOption } from "../types";
 
@@ -9,7 +10,7 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // --- Model Mapping ---
 const modelMap: Record<Exclude<AIModelOption, 'gemini'>, string> = {
-    zia: 'deepseek/deepseek-chat', // Using a standard deepseek model for Zia as requested
+    zia: 'deepseek/deepseek-chat', 
     deepseek: 'deepseek/deepseek-chat',
     qwen: 'qwen/qwen-2-7b-instruct:free',
 };
