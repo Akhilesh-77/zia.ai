@@ -15,8 +15,10 @@ const ApiKeyWarningBanner: React.FC<{onDismiss: () => void}> = ({onDismiss}) => 
   <div className="absolute top-0 left-0 right-0 bg-yellow-500/90 text-black p-3 text-center text-sm z-50 flex items-center justify-center gap-4 animate-fadeIn">
     <div>
         <p>
-            <strong className="font-bold">Warning:</strong> The Gemini <code className="bg-black/20 px-1 rounded">API_KEY</code> is not set. 
-            Image generation and some AI features may be unavailable. The app is using fallback models.
+            <strong className="font-bold">Configuration Required:</strong> The <code className="bg-black/20 px-1 rounded">API_KEY</code> environment variable is missing.
+        </p>
+        <p className="text-xs mt-1">
+            Please add it to your hosting provider's settings (e.g., AWS Amplify) to enable all AI features. The app is in limited mode.
         </p>
     </div>
     <button onClick={onDismiss} className="p-1 rounded-full hover:bg-black/20">&times;</button>
