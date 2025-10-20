@@ -1,13 +1,22 @@
+export type AIModelOption = 'gemini' | 'zia' | 'deepseek' | 'qwen';
+
 export interface BotProfile {
   id: string;
-  name:string;
+  name: string;
   description: string;
-  photo: string; // base64 string
-  gif?: string; // base64 string
   personality: string;
+  photo: string; // base64 data URL
+  gif?: string | null; // base64 data URL
   scenario: string;
-  personaId?: string;
-  chatBackground?: string; // base64 string for 9:16 aspect ratio image
+  chatBackground?: string | null; // base64 data URL
+  personaId?: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: number;
 }
 
 export interface Persona {
@@ -15,13 +24,5 @@ export interface Persona {
   name: string;
   description?: string;
   personality: string;
-  photo?: string; // base64 string
-}
-
-export type MessageSender = 'user' | 'assistant';
-
-export interface ChatMessage {
-  id:number;
-  text: string;
-  sender: MessageSender;
+  photo?: string | null; // base64 data URL
 }

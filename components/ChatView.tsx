@@ -1,285 +1,198 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { BotProfile, ChatMessage, Persona } from '../types';
-import { VoiceOption } from '../App';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import type { BotProfile, ChatMessage, Persona, AIModelOption } from '../types';
 import { generateBotResponse, generateUserResponseSuggestion } from '../services/geminiService';
+import { xyz } from '../services/xyz';
 
-interface ChatPageProps {
-  profile: BotProfile;
-  persona?: Persona | null;
-  onNavigate: (page: 'home' | 'bots') => void;
-  onEditBot: (id: string) => void;
-  initialMessages: ChatMessage[];
-  onSaveHistory: (botId: string, messages: ChatMessage[]) => void;
-  voicePreference: VoiceOption;
+interface ChatViewProps {
+  bot: BotProfile & { persona?: Persona | null };
+  onBack: () => void;
+  chatHistory: ChatMessage[];
+  onNewMessage: (message: ChatMessage) => void;
+  onUpdateHistory: (newHistory: ChatMessage[]) => void;
+  selectedAI: AIModelOption;
 }
 
-const renderMessageText = (text: string) => {
-    const parts = text.split(/(\*.*?\*)/g);
-    return (
-      <p className="whitespace-pre-wrap">
-        {parts.map((part, index) => {
-          if (part.startsWith('*') && part.endsWith('*')) {
-            return <em key={index} className="text-accent italic not-italic action-text-tilted">{part.slice(1, -1)}</em>;
-          }
-          return <span key={index}>{part}</span>;
-        })}
-      </p>
-    );
-};
-
-const MessageBubble: React.FC<{
-    message: ChatMessage;
-    botPhotoUrl?: string;
-    personaPhotoUrl?: string;
-    onDelete: () => void;
-    onRegenerate: () => void;
-    onPlayVoice: (text: string) => void;
-    onPhotoClick: (url: string) => void;
-}> = ({ message, botPhotoUrl, personaPhotoUrl, onDelete, onRegenerate, onPlayVoice, onPhotoClick }) => {
-    const isUser = message.sender === 'user';
-    const isAssistant = message.sender === 'assistant';
-
-    return (
-        <div className={`group flex w-full items-end gap-2.5 max-w-md mx-auto animate-fadeIn ${isUser ? 'justify-end' : 'justify-start'}`}>
-            {isAssistant && botPhotoUrl && (
-                 <img src={botPhotoUrl} alt="Bot" className="h-8 w-8 rounded-full shadow-md object-cover ring-1 ring-accent/50 cursor-pointer flex-shrink-0" onClick={() => onPhotoClick(botPhotoUrl)} />
-            )}
-            
-            <div className={`flex items-center gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`relative px-4 py-3 rounded-2xl shadow-md max-w-xs md:max-w-md ${isUser ? 'bg-accent text-white rounded-br-none' : 'bg-gray-700 text-white rounded-bl-none'}`}>
-                    {isAssistant ? renderMessageText(`"${message.text}"`) : renderMessageText(message.text)}
-                </div>
-
-                <div className={`flex items-center self-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                    {isAssistant && (
-                        <>
-                            <button onClick={() => onPlayVoice(message.text)} className="p-1.5 rounded-full hover:bg-white/20" aria-label="Play voice">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.858 5.858a3 3 0 000 4.243m12.728 0a3 3 0 000-4.243M12 12h.01" /></svg>
-                            </button>
-                            <button onClick={onRegenerate} className="p-1.5 rounded-full hover:bg-white/20" aria-label="Regenerate">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 13M20 20l-1.5-1.5A9 9 0 003.5 11" /></svg>
-                            </button>
-                        </>
-                    )}
-                    <button onClick={onDelete} className="p-1.5 rounded-full hover:bg-white/20" aria-label="Delete">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                </div>
-            </div>
-
-            {isAssistant && personaPhotoUrl && (
-                <img src={personaPhotoUrl} alt="Persona" className="h-8 w-8 rounded-full shadow-md object-cover ring-1 ring-white/20 cursor-pointer flex-shrink-0" onClick={() => onPhotoClick(personaPhotoUrl)} />
-            )}
-        </div>
-    );
-};
-
-const PhotoModal: React.FC<{ photoUrl: string; onClose: () => void; }> = ({ photoUrl, onClose }) => {
-    return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fadeIn" onClick={onClose}>
-            <div className="p-4 bg-dark-bg rounded-2xl shadow-2xl relative max-w-md w-full mx-auto" onClick={(e) => e.stopPropagation()}>
-                <img src={photoUrl} alt="Bot full view" className="max-h-[80vh] w-full object-contain rounded-lg" />
-                <button onClick={onClose} className="absolute -top-4 -right-4 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center font-bold text-lg">&times;</button>
-            </div>
-        </div>
-    );
-};
-
-
-const ChatPage: React.FC<ChatPageProps> = ({ profile, persona, onNavigate, onEditBot, initialMessages, onSaveHistory, voicePreference }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [userInput, setUserInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isBuilding, setIsBuilding] = useState(false);
-  const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
+const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMessage, onUpdateHistory, selectedAI }) => {
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
   
   useEffect(() => {
-    const loadVoices = () => setVoices(speechSynthesis.getVoices());
-    loadVoices();
-    speechSynthesis.onvoiceschanged = loadVoices;
+    if (chatHistory.length === 0 && bot.scenario) {
+      const scenarioMessage: ChatMessage = {
+        id: `bot-${Date.now()}`,
+        text: bot.scenario,
+        sender: 'bot',
+        timestamp: Date.now(),
+      };
+      onNewMessage(scenarioMessage);
+    }
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  const handleSend = async (messageText: string) => {
+    if (!messageText.trim()) return;
 
-  useEffect(() => {
-    if (messages.length === 0 && profile.scenario) {
-      const scenarioMessage = { id: Date.now(), text: profile.scenario, sender: 'assistant' as const };
-      setMessages([scenarioMessage]);
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      text: messageText,
+      sender: 'user',
+      timestamp: Date.now(),
+    };
+    
+    const newHistory = [...chatHistory, userMessage];
+    onUpdateHistory(newHistory); // Update history immediately with user message
+    setInput('');
+    setIsTyping(true);
+
+    try {
+      const enhancedPersonality = xyz(newHistory, userMessage.text, bot.personality);
+      const botResponseText = await generateBotResponse(newHistory, enhancedPersonality, selectedAI);
+
+      const finalBotMessage: ChatMessage = {
+        id: `bot-${Date.now()}`,
+        text: botResponseText,
+        sender: 'bot',
+        timestamp: Date.now(),
+      };
+      onNewMessage(finalBotMessage);
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+      onNewMessage({
+        id: `error-${Date.now()}`,
+        text: "Sorry, I encountered an error. Please try again.",
+        sender: 'bot',
+        timestamp: Date.now()
+      });
+    } finally {
+      setIsTyping(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id]); 
-  
-  useEffect(() => {
-    onSaveHistory(profile.id, messages);
-  }, [messages, profile.id, onSaveHistory]);
-
-  const getBotResponse = async (history: ChatMessage[], prompt: string) => {
-      setIsLoading(true);
-      try {
-        const botResponseText = await generateBotResponse(profile, history, prompt);
-        const botMessage: ChatMessage = { id: Date.now() + 1, text: botResponseText, sender: 'assistant' };
-        setMessages(prev => [...prev, botMessage]);
-      } catch (error) {
-        console.error("Failed to get bot response:", error);
-        setMessages(prev => [...prev, { id: Date.now() + 1, text: "Sorry, an error occurred.", sender: 'assistant' }]);
-      } finally {
-        setIsLoading(false);
-      }
-  }
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userInput.trim() || isLoading) return;
-
-    const userMessage: ChatMessage = { id: Date.now(), text: userInput, sender: 'user' };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    const messageToSend = userInput;
-    setUserInput('');
-    await getBotResponse(newMessages, messageToSend);
-  };
-  
-  const handleDeleteMessage = (messageId: number) => {
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
   };
   
   const handleBuildMessage = async () => {
-    if (isBuilding || messages.length === 0) return;
-    setIsBuilding(true);
-    try {
-        const suggestion = await generateUserResponseSuggestion(profile, messages);
-        setUserInput(suggestion);
-    } catch (error) {
-        console.error("Failed to build message:", error);
-    } finally {
-        setIsBuilding(false);
-    }
+      setIsTyping(true);
+      try {
+          const suggestion = await generateUserResponseSuggestion(chatHistory, bot.personality, selectedAI);
+          setInput(suggestion.replace(/"/g, '')); // Remove quotes from suggestions
+      } catch (error) {
+          console.error("Failed to build message suggestion:", error);
+          setInput("Sorry, couldn't think of anything right now.");
+      } finally {
+          setIsTyping(false);
+      }
   };
 
-  const handleRegenerate = async (messageId: number) => {
-      if (isLoading) return;
-      const messageIndex = messages.findIndex(m => m.id === messageId);
-      if (messageIndex <= 0 || messages[messageIndex].sender !== 'assistant') return;
-      
-      const historyForApi = messages.slice(0, messageIndex);
-      const lastUserMessage = historyForApi.slice().reverse().find(m => m.sender === 'user');
-      
-      if (!lastUserMessage) return;
-
-      setIsLoading(true);
-      try {
-          const newBotText = await generateBotResponse(profile, historyForApi, lastUserMessage.text);
-          const updatedMessages = [...messages];
-          updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], text: newBotText };
-          setMessages(updatedMessages);
-      } catch (error) {
-          console.error("Failed to regenerate message:", error);
-      } finally {
-          setIsLoading(false);
-      }
+  const handleDeleteMessage = (messageId: string) => {
+      const newHistory = chatHistory.filter(m => m.id !== messageId);
+      onUpdateHistory(newHistory);
   };
   
-  const handlePlayVoice = (text: string) => {
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      if (voices.length > 0) {
-          let selectedVoice: SpeechSynthesisVoice | undefined;
-          if (voicePreference === 'male') {
-              // Fix: Property 'gender' does not exist on type 'SpeechSynthesisVoice'. Using voice name to infer gender.
-              selectedVoice = voices.find(v => v.name.toLowerCase().includes('male') && v.lang.startsWith('en'));
-          } else if (voicePreference === 'female') {
-              // Fix: Property 'gender' does not exist on type 'SpeechSynthesisVoice'. Using voice name to infer gender.
-              selectedVoice = voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en'));
-          }
-          // If auto or preferred not found, use a default english voice
-          if (!selectedVoice) {
-              selectedVoice = voices.find(v => v.lang.startsWith('en'));
-          }
-          utterance.voice = selectedVoice || null;
+  const handleRegenerateMessage = async (messageId: string) => {
+      const messageIndex = chatHistory.findIndex(m => m.id === messageId);
+      if (messageIndex === -1 || chatHistory[messageIndex].sender !== 'bot') return;
+
+      const historyForRegen = chatHistory.slice(0, messageIndex);
+      setIsTyping(true);
+      try {
+          const enhancedPersonality = xyz(historyForRegen, historyForRegen[historyForRegen.length-1]?.text || '', bot.personality);
+          const botResponseText = await generateBotResponse(historyForRegen, enhancedPersonality, selectedAI);
+          
+          const newHistory = [...chatHistory];
+          newHistory[messageIndex] = { ...newHistory[messageIndex], text: botResponseText, timestamp: Date.now() };
+          onUpdateHistory(newHistory);
+      } catch (error) {
+          console.error("Error regenerating message:", error);
+      } finally {
+          setIsTyping(false);
       }
-      speechSynthesis.speak(utterance);
-  }
+  };
+
+  const parseMessage = (text: string) => {
+    const parts = text.split(/(\*.*?\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={index} className="text-accent italic action-text-tilted">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+  };
 
   return (
-    <div className="relative h-full w-full flex flex-col bg-light-bg dark:bg-dark-bg text-light-text dark:text-dark-text">
-      {profile.chatBackground && (
-        <>
-            <div 
-                className="absolute inset-0 bg-cover bg-center z-0" 
-                style={{ backgroundImage: `url(${profile.chatBackground})`, opacity: 0.85 }}
-            ></div>
-            <div className="absolute inset-0 bg-dark-bg/30 z-0"></div>
-        </>
-      )}
-      <div className="relative z-10 flex flex-col h-full">
-        {photoModalUrl && <PhotoModal photoUrl={photoModalUrl} onClose={() => setPhotoModalUrl(null)} />}
-        <header className="flex items-center p-2 border-b border-white/10 dark:border-black/20 shadow-md backdrop-blur-sm bg-white/5 dark:bg-black/5 gap-2">
-            <button onClick={() => onNavigate('bots')} className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-black/20 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
-            <img src={profile.photo} alt={profile.name} className="h-10 w-10 object-cover rounded-lg cursor-pointer" onClick={() => setPhotoModalUrl(profile.photo)}/>
-            <span className="font-bold flex-1">{profile.name}</span>
-            {profile.gif && (
-            <img src={profile.gif} alt={`${profile.name} gif`} className="w-10 h-10 object-cover rounded-md" />
-            )}
-            <button onClick={() => onEditBot(profile.id)} className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-black/20 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" /></svg>
-            </button>
-        </header>
-        
-        <main className="flex-1 p-4 space-y-4 overflow-y-auto">
-            {messages.map((msg) => 
-                <MessageBubble 
-                    key={msg.id} 
-                    message={msg} 
-                    botPhotoUrl={profile.photo}
-                    personaPhotoUrl={persona?.photo}
-                    onDelete={() => handleDeleteMessage(msg.id)}
-                    onRegenerate={() => handleRegenerate(msg.id)}
-                    onPlayVoice={handlePlayVoice}
-                    onPhotoClick={setPhotoModalUrl}
-                />
-            )}
-            {isLoading && (
-                <div className="flex w-full items-end gap-2.5 max-w-md mx-auto justify-start">
-                     <img src={profile.photo} alt="Bot" className="h-8 w-8 rounded-full shadow-md object-cover" />
-                    <div className="px-4 py-2 rounded-2xl shadow-md bg-gray-700 text-white rounded-bl-none">
-                        <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-accent rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="w-2 h-2 bg-accent rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="w-2 h-2 bg-accent rounded-full animate-bounce"></div>
-                        </div>
+    <div className="h-full w-full flex flex-col bg-light-bg text-light-text dark:bg-dark-bg dark:text-dark-text relative">
+        {bot.chatBackground && (
+            <div style={{backgroundImage: `url(${bot.chatBackground})`}} className="absolute inset-0 w-full h-full bg-cover bg-center z-0" >
+                <div className="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm"></div>
+            </div>
+        )}
+      <header className="flex items-center p-4 border-b border-white/10 dark:border-black/20 z-10 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-sm">
+        <button onClick={onBack} className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-black/20">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <img src={bot.photo} alt={bot.name} className="h-10 w-10 rounded-full object-cover ml-4" />
+        <div className="ml-3">
+          <h2 className="font-bold">{bot.name}</h2>
+          <p className="text-xs text-gray-400">{bot.description}</p>
+        </div>
+      </header>
+      
+      <main className="flex-1 overflow-y-auto p-4 space-y-1 z-10">
+        {chatHistory.map((msg) => (
+          <div key={msg.id} className={`flex items-end gap-2 group ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {msg.sender === 'bot' && <img src={bot.photo} alt={bot.name} className="h-8 w-8 rounded-full object-cover self-start" />}
+            
+            <div className={`flex items-center gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl ${msg.sender === 'user' ? 'bg-accent text-white rounded-br-none' : 'bg-white/10 dark:bg-black/20 rounded-bl-none'}`}>
+                    <p className="whitespace-pre-wrap">{parseMessage(msg.text)}</p>
+                </div>
+                {msg.sender === 'bot' && (
+                    <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleRegenerateMessage(msg.id)} className="p-1 rounded-full bg-black/30 hover:bg-accent"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 15M20 20l-1.5-1.5A9 9 0 013.5 9" /></svg></button>
+                        <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 rounded-full bg-black/30 hover:bg-red-500"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                    </div>
+                )}
+            </div>
+             {msg.sender === 'bot' && bot.persona?.photo && <img src={bot.persona.photo} alt={bot.persona.name} className="h-8 w-8 rounded-full object-cover self-start" />}
+          </div>
+        ))}
+        {isTyping && (
+            <div className="flex items-end gap-2 justify-start">
+                <img src={bot.photo} alt={bot.name} className="h-8 w-8 rounded-full object-cover" />
+                <div className="p-3 rounded-2xl bg-white/10 dark:bg-black/20 rounded-bl-none">
+                    <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
                     </div>
                 </div>
-            )}
-            <div ref={messagesEndRef} />
-        </main>
+            </div>
+        )}
+        <div ref={messagesEndRef} />
+      </main>
 
-        <footer className="p-4 bg-light-bg/80 dark:bg-dark-bg/80 border-t border-white/10 dark:border-black/20 backdrop-blur-sm">
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-            <button type="button" onClick={handleBuildMessage} disabled={isBuilding} className="p-2 rounded-full hover:bg-white/10 dark:hover:bg-black/20 transition-colors disabled:opacity-50">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
-            </button>
-            <input
-                type="text"
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 bg-white/10 dark:bg-black/10 p-3 rounded-2xl border border-white/20 dark:border-black/20 focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-300"
-                disabled={isLoading}
-            />
-            <button type="submit" className="bg-accent rounded-full p-3 text-white disabled:bg-gray-600 transition-colors shadow-lg" disabled={isLoading || !userInput.trim()}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-            </button>
-            </form>
-        </footer>
-      </div>
+      <footer className="p-4 border-t border-white/10 dark:border-black/20 z-10 bg-light-bg/80 dark:bg-dark-bg/80 backdrop-blur-sm">
+        <div className="flex items-center bg-white/10 dark:bg-black/20 rounded-2xl pl-2">
+          <button onClick={handleBuildMessage} disabled={isTyping} className="p-2 text-gray-400 hover:text-accent disabled:opacity-50 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          </button>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(input); } }}
+            placeholder="Type your message..."
+            rows={1}
+            className="flex-1 bg-transparent p-3 focus:outline-none resize-none max-h-24"
+          />
+          <button onClick={() => handleSend(input)} disabled={isTyping || !input.trim()} className="bg-accent rounded-full h-10 w-10 flex items-center justify-center text-white disabled:opacity-50 transition-opacity mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          </button>
+        </div>
+      </footer>
     </div>
   );
 };
 
-export default ChatPage;
+export default ChatView;

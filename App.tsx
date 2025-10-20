@@ -1,270 +1,245 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
-import CreationPage from './components/CreationForm';
-import ChatPage from './components/ChatView';
 import BotsPage from './components/BotsPage';
-import FooterNav from './components/FooterNav';
+import CreationForm from './components/CreationForm';
+import ChatView from './components/ChatView';
 import PersonasPage from './components/PersonasPage';
 import ImageGeneratorPage from './components/ImageGeneratorPage';
-import SettingsPanel from './components/SettingsPanel'; // New component
-import type { BotProfile, ChatMessage, Persona } from './types';
+import FooterNav from './components/FooterNav';
+import SettingsPanel from './components/SettingsPanel';
+import type { BotProfile, Persona, ChatMessage, AIModelOption } from './types';
 
-export type Page = 'home' | 'bots' | 'create' | 'chat' | 'personas' | 'images';
-export type Theme = 'light' | 'dark';
-export type VoiceOption = 'male' | 'female' | 'auto';
+export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat';
 
 const App: React.FC = () => {
-  const [page, setPage] = useState<Page>('home');
+  const [currentPage, setCurrentPage] = useState<Page>('home');
   const [bots, setBots] = useState<BotProfile[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [chatHistory, setChatHistory] = useState<Record<string, ChatMessage[]>>({});
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
+  const [botToEdit, setBotToEdit] = useState<BotProfile | null>(null);
+  const [chatHistories, setChatHistories] = useState<Record<string, ChatMessage[]>>({});
   const [botUsage, setBotUsage] = useState<Record<string, number>>({});
-  const [personaUsage, setPersonaUsage] = useState<Record<string, number>>({});
-  const [activeBotId, setActiveBotId] = useState<string | null>(null);
-  const [editingBotId, setEditingBotId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [voicePreference, setVoicePreference] = useState<VoiceOption>('auto');
+  const [selectedAI, setSelectedAI] = useState<AIModelOption>('gemini');
 
+  // Load data from localStorage on initial render
   useEffect(() => {
-    // Load data from local storage
     try {
-      const storedBots = localStorage.getItem('bots');
-      if (storedBots) setBots(JSON.parse(storedBots));
+      const savedBots = localStorage.getItem('bots');
+      if (savedBots) setBots(JSON.parse(savedBots));
       
-      const storedPersonas = localStorage.getItem('personas');
-      if (storedPersonas) setPersonas(JSON.parse(storedPersonas));
+      const savedPersonas = localStorage.getItem('personas');
+      if (savedPersonas) setPersonas(JSON.parse(savedPersonas));
       
-      const storedHistory = localStorage.getItem('chatHistory');
-      if (storedHistory) setChatHistory(JSON.parse(storedHistory));
-      
-      const storedBotUsage = localStorage.getItem('botUsage');
-      if (storedBotUsage) setBotUsage(JSON.parse(storedBotUsage));
+      const savedHistories = localStorage.getItem('chatHistories');
+      if (savedHistories) setChatHistories(JSON.parse(savedHistories));
 
-      const storedPersonaUsage = localStorage.getItem('personaUsage');
-      if (storedPersonaUsage) setPersonaUsage(JSON.parse(storedPersonaUsage));
+      const savedUsage = localStorage.getItem('botUsage');
+      if (savedUsage) setBotUsage(JSON.parse(savedUsage));
 
-      const storedVoicePref = localStorage.getItem('voicePreference') as VoiceOption;
-      if (storedVoicePref) setVoicePreference(storedVoicePref);
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+          setTheme(savedTheme);
+      } else {
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          setTheme(prefersDark ? 'dark' : 'light');
+      }
 
-    } catch (e) {
-      console.error("Failed to parse data from localStorage", e);
-    }
-     // Load theme from local storage
-    const storedTheme = localStorage.getItem('theme') as Theme;
-    if (storedTheme) {
-      setTheme(storedTheme);
-    } else {
-      setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      const savedAI = localStorage.getItem('selectedAI');
+      if (savedAI && ['gemini', 'zia', 'deepseek', 'qwen'].includes(savedAI)) {
+          setSelectedAI(savedAI as AIModelOption);
+      }
+
+    } catch (error) {
+        console.error("Failed to load data from localStorage", error);
     }
   }, []);
 
+  // Save data to localStorage whenever it changes
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove(theme === 'dark' ? 'light' : 'dark');
-    root.classList.add(theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    try {
+        localStorage.setItem('bots', JSON.stringify(bots));
+        localStorage.setItem('personas', JSON.stringify(personas));
+        localStorage.setItem('chatHistories', JSON.stringify(chatHistories));
+        localStorage.setItem('botUsage', JSON.stringify(botUsage));
+        localStorage.setItem('theme', theme);
+        localStorage.setItem('selectedAI', selectedAI);
+
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    } catch (error) {
+        console.error("Failed to save data to localStorage", error);
+    }
+  }, [bots, personas, chatHistories, botUsage, theme, selectedAI]);
+
+  const handleNavigate = (page: Page) => {
+    if (page === 'create') {
+        setBotToEdit(null);
+    }
+    setCurrentPage(page);
+  };
   
-  const handleSetVoicePreference = (pref: VoiceOption) => {
-      setVoicePreference(pref);
-      localStorage.setItem('voicePreference', pref);
+  const handleSelectBot = (id: string) => {
+    setSelectedBotId(id);
+    setBotUsage(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+    setCurrentPage('chat');
   };
 
+  const handleEditBot = (id: string) => {
+    const bot = bots.find(b => b.id === id);
+    if (bot) {
+        setBotToEdit(bot);
+        setCurrentPage('create');
+    }
+  };
+
+  const handleDeleteBot = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this bot?")) {
+        setBots(prev => prev.filter(b => b.id !== id));
+        setChatHistories(prev => {
+            const newHistories = { ...prev };
+            delete newHistories[id];
+            return newHistories;
+        });
+    }
+  };
 
   const handleSaveBot = (botData: Omit<BotProfile, 'id'> | BotProfile) => {
-    let updatedBots;
     if ('id' in botData) {
-      updatedBots = bots.map(b => b.id === botData.id ? botData : b);
+      setBots(prev => prev.map(b => b.id === botData.id ? { ...b, ...botData } : b));
     } else {
-      const newBot = { ...botData, id: Date.now().toString() };
-      updatedBots = [...bots, newBot];
+      const newBot = { ...botData, id: `bot-${Date.now()}` };
+      setBots(prev => [...prev, newBot]);
     }
-    setBots(updatedBots);
-    localStorage.setItem('bots', JSON.stringify(updatedBots));
-    setEditingBotId(null);
-  };
-
-  const handleDeleteBot = (botId: string) => {
-    if (window.confirm("Are you sure you want to delete this bot and its chat history?")) {
-        const updatedBots = bots.filter(b => b.id !== botId);
-        setBots(updatedBots);
-        localStorage.setItem('bots', JSON.stringify(updatedBots));
-        
-        const updatedHistory = {...chatHistory};
-        delete updatedHistory[botId];
-        setChatHistory(updatedHistory);
-        localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
-        
-        const updatedUsage = {...botUsage};
-        delete updatedUsage[botId];
-        setBotUsage(updatedUsage);
-        localStorage.setItem('botUsage', JSON.stringify(updatedUsage));
-    }
+    setBotToEdit(null);
   };
   
   const handleSavePersona = (personaData: Omit<Persona, 'id'> | Persona) => {
-    let updatedPersonas;
     if ('id' in personaData) {
-        updatedPersonas = personas.map(p => p.id === personaData.id ? personaData : p);
+        setPersonas(prev => prev.map(p => p.id === personaData.id ? { ...p, ...personaData } : p));
     } else {
-        const newPersona = { ...personaData, id: Date.now().toString() };
-        updatedPersonas = [...personas, newPersona];
+        const newPersona = { ...personaData, id: `persona-${Date.now()}`};
+        setPersonas(prev => [...prev, newPersona]);
     }
-    setPersonas(updatedPersonas);
-    localStorage.setItem('personas', JSON.stringify(updatedPersonas));
+  };
+
+  const handleDeletePersona = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this persona? This will not affect bots currently using it, but they will no longer be linked.")) {
+        setPersonas(prev => prev.filter(p => p.id !== id));
+        setBots(prev => prev.map(b => b.personaId === id ? { ...b, personaId: null } : b));
+    }
   };
   
-  const handleAssignPersona = (personaId: string, botIdsToAssign: string[]) => {
+  const handleAssignPersona = (personaId: string, botIds: string[]) => {
       const persona = personas.find(p => p.id === personaId);
       if (!persona) return;
-
-      const updatedBots = bots.map(bot => {
-          if (botIdsToAssign.includes(bot.id)) {
-              // Assign persona
+      
+      setBots(prevBots => prevBots.map(bot => {
+          if (botIds.includes(bot.id)) {
               return { ...bot, personaId: persona.id, personality: persona.personality };
-          } else if (bot.personaId === personaId && !botIdsToAssign.includes(bot.id)) {
-              // Un-assign persona (bot was previously assigned but now is not)
-              // We leave the personality prompt as is, but remove the link.
-              return { ...bot, personaId: undefined };
           }
           return bot;
-      });
-      
-      setBots(updatedBots);
-      localStorage.setItem('bots', JSON.stringify(updatedBots));
-
-      // Track persona usage
-      const newUsage = { ...personaUsage, [personaId]: (personaUsage[personaId] || 0) + 1 };
-      setPersonaUsage(newUsage);
-      localStorage.setItem('personaUsage', JSON.stringify(newUsage));
+      }));
   };
 
-  const handleDeletePersona = (personaId: string) => {
-    if (window.confirm("Are you sure you want to delete this persona? This will unassign it from all bots.")) {
-        const updatedPersonas = personas.filter(p => p.id !== personaId);
-        setPersonas(updatedPersonas);
-        localStorage.setItem('personas', JSON.stringify(updatedPersonas));
-
-        // Un-assign from bots
-        const updatedBots = bots.map(bot => {
-            if (bot.personaId === personaId) {
-                return { ...bot, personaId: undefined };
-            }
-            return bot;
-        });
-        setBots(updatedBots);
-        localStorage.setItem('bots', JSON.stringify(updatedBots));
-
-        const updatedUsage = {...personaUsage};
-        delete updatedUsage[personaId];
-        setPersonaUsage(updatedUsage);
-        localStorage.setItem('personaUsage', JSON.stringify(updatedUsage));
-    }
-  };
-
-  const handleSaveHistory = useCallback((botId: string, messages: ChatMessage[]) => {
-      const newHistory = {...chatHistory, [botId]: messages };
-      setChatHistory(newHistory);
-      localStorage.setItem('chatHistory', JSON.stringify(newHistory));
-  }, [chatHistory]);
-
-  const handleEditBot = (botId: string) => {
-    setEditingBotId(botId);
-    setPage('create');
-  };
-
-  const handleSelectBot = (botId: string) => {
-    const newUsage = { ...botUsage, [botId]: (botUsage[botId] || 0) + 1 };
-    setBotUsage(newUsage);
-    localStorage.setItem('botUsage', JSON.stringify(newUsage));
-    
-    setActiveBotId(botId);
-    setPage('chat');
-  };
-
-  const handleNavigate = (targetPage: Page) => {
-    if (targetPage !== 'create' && targetPage !== 'chat') {
-        setEditingBotId(null);
-    }
-    if (targetPage !== 'chat') {
-        setActiveBotId(null);
-    }
-    setPage(targetPage);
+  const handleNewMessage = (botId: string, message: ChatMessage) => {
+    setChatHistories(prev => ({
+        ...prev,
+        [botId]: [...(prev[botId] || []), message]
+    }));
   };
   
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark');
+  const handleUpdateHistory = (botId: string, newHistory: ChatMessage[]) => {
+    setChatHistories(prev => ({
+      ...prev,
+      [botId]: newHistory,
+    }));
   };
 
-  const activeBot = bots.find(b => b.id === activeBotId);
-  const botToEdit = bots.find(b => b.id === editingBotId);
-  const activePersona = activeBot?.personaId ? personas.find(p => p.id === activeBot.personaId) : null;
+  const handleClearData = () => {
+      if (window.confirm("Are you sure you want to delete all your bots, personas, and chat history? This cannot be undone.")) {
+        setBots([]);
+        setPersonas([]);
+        setChatHistories({});
+        setBotUsage({});
+        localStorage.removeItem('bots');
+        localStorage.removeItem('personas');
+        localStorage.removeItem('chatHistories');
+        localStorage.removeItem('botUsage');
+      }
+  };
+
+  const selectedBot = bots.find(b => b.id === selectedBotId);
+  const personaForBot = personas.find(p => p.id === selectedBot?.personaId);
+  
+  const effectiveBot = selectedBot ? {
+      ...selectedBot,
+      personality: personaForBot?.personality || selectedBot.personality,
+      persona: personaForBot
+  } : null;
 
   const renderPage = () => {
-    switch(page) {
-      case 'create':
-        return <CreationPage 
-                  onSaveBot={handleSaveBot} 
-                  onNavigate={handleNavigate} 
-                  botToEdit={botToEdit ?? null}
+    switch(currentPage) {
+      case 'home':
+        return <HomePage 
+                    bots={bots} 
+                    botUsage={botUsage}
+                    onSelectBot={handleSelectBot} 
+                    onEditBot={handleEditBot}
+                    onDeleteBot={handleDeleteBot}
+                    theme={theme}
+                    toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+                    onOpenSettings={() => setIsSettingsOpen(true)}
                 />;
-      case 'chat':
-        return activeBot && <ChatPage 
-                                profile={activeBot}
-                                persona={activePersona} 
-                                onNavigate={handleNavigate} 
-                                onEditBot={handleEditBot}
-                                initialMessages={chatHistory[activeBot.id] || []}
-                                onSaveHistory={handleSaveHistory}
-                                voicePreference={voicePreference}
-                             />;
       case 'bots':
-        return <BotsPage 
-                  bots={bots} 
-                  onSelectBot={handleSelectBot} 
-                  onEditBot={handleEditBot}
-                  onDeleteBot={handleDeleteBot}
-                />;
-      case 'personas':
-        return <PersonasPage
-                  personas={personas}
-                  bots={bots}
-                  onSave={handleSavePersona}
-                  onDelete={handleDeletePersona}
-                  onAssign={handleAssignPersona}
-                />;
+        return <BotsPage bots={bots} onSelectBot={handleSelectBot} onEditBot={handleEditBot} onDeleteBot={handleDeleteBot} />;
+      case 'create':
+        return <CreationForm onSaveBot={handleSaveBot} onNavigate={handleNavigate} botToEdit={botToEdit} />;
       case 'images':
         return <ImageGeneratorPage />;
-      case 'home':
+      case 'personas':
+        return <PersonasPage personas={personas} bots={bots} onSave={handleSavePersona} onDelete={handleDeletePersona} onAssign={handleAssignPersona} />;
+      case 'chat':
+        if (effectiveBot) {
+          return <ChatView 
+                    bot={effectiveBot} 
+                    onBack={() => setCurrentPage('home')}
+                    chatHistory={chatHistories[effectiveBot.id] || []}
+                    onNewMessage={(message) => handleNewMessage(effectiveBot.id, message)}
+                    onUpdateHistory={(newHistory) => handleUpdateHistory(effectiveBot.id, newHistory)}
+                    selectedAI={selectedAI}
+                 />;
+        }
+        setCurrentPage('home');
+        return null;
       default:
-        return <HomePage 
-                  bots={bots}
-                  botUsage={botUsage}
-                  onSelectBot={handleSelectBot} 
-                  onEditBot={handleEditBot}
-                  onDeleteBot={handleDeleteBot}
-                  theme={theme} 
-                  toggleTheme={toggleTheme}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
-                />;
+        return null;
     }
-  }
-
-  const showFooter = page === 'home' || page === 'bots' || page === 'create' || page === 'images' || page === 'personas';
+  };
 
   return (
-    <div className="h-screen w-full max-w-md mx-auto overflow-hidden shadow-2xl bg-light-bg dark:bg-dark-bg flex flex-col">
-       <SettingsPanel 
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            currentVoice={voicePreference}
-            onSetVoice={handleSetVoicePreference}
-        />
-      <div className="flex-1 overflow-y-auto">
+    <div className={`w-full h-full max-w-md mx-auto flex flex-col font-sans shadow-2xl overflow-hidden relative ${theme}`}>
+      <SettingsPanel 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)} 
+        theme={theme}
+        toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+        onClearData={handleClearData}
+        selectedAI={selectedAI}
+        onSelectAI={setSelectedAI}
+      />
+      <div className="flex-1 overflow-hidden">
         {renderPage()}
       </div>
-      {showFooter && <FooterNav currentPage={page} onNavigate={handleNavigate} />}
+      {currentPage !== 'chat' && (
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md">
+            <FooterNav currentPage={currentPage} onNavigate={handleNavigate} />
+        </div>
+      )}
     </div>
   );
 };
