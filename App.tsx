@@ -97,6 +97,23 @@ const App: React.FC = () => {
   };
   
   const handleSelectBot = (id: string) => {
+    // FIX: Ensure chat history is initialized with the scenario message if it doesn't exist.
+    if (!chatHistories[id] || chatHistories[id].length === 0) {
+      const bot = bots.find(b => b.id === id);
+      if (bot?.scenario) {
+        const initialMessage: ChatMessage = {
+          id: `bot-initial-${Date.now()}`,
+          text: bot.scenario,
+          sender: 'bot',
+          timestamp: Date.now(),
+        };
+        // Use functional update to avoid race conditions with state
+        setChatHistories(prev => ({
+          ...prev,
+          [id]: [initialMessage],
+        }));
+      }
+    }
     setSelectedBotId(id);
     setBotUsage(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
     setCurrentPage('chat');
