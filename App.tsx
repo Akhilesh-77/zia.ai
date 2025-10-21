@@ -5,11 +5,12 @@ import CreationForm from './components/CreationForm';
 import ChatView from './components/ChatView';
 import PersonasPage from './components/PersonasPage';
 import ImageGeneratorPage from './components/ImageGeneratorPage';
+import ScenarioGeneratorPage from './components/ScenarioGeneratorPage';
 import FooterNav from './components/FooterNav';
 import SettingsPanel from './components/SettingsPanel';
 import type { BotProfile, Persona, ChatMessage, AIModelOption, VoicePreference } from './types';
 
-export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat';
+export type Page = 'home' | 'bots' | 'create' | 'images' | 'personas' | 'chat' | 'scenario';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -53,7 +54,7 @@ const App: React.FC = () => {
       }
       
       const savedVoice = localStorage.getItem('voicePreference');
-      if (savedVoice && ['male', 'female'].includes(savedVoice)) {
+      if (savedVoice) {
           setVoicePreference(savedVoice as VoicePreference);
       }
 
@@ -72,7 +73,11 @@ const App: React.FC = () => {
         localStorage.setItem('botUsage', JSON.stringify(botUsage));
         localStorage.setItem('theme', theme);
         localStorage.setItem('selectedAI', selectedAI);
-        if(voicePreference) localStorage.setItem('voicePreference', voicePreference);
+        if(voicePreference) {
+            localStorage.setItem('voicePreference', voicePreference);
+        } else {
+            localStorage.removeItem('voicePreference');
+        }
 
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -168,6 +173,18 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleStartNewChat = (botId: string) => {
+    if (window.confirm("Are you sure you want to start a new chat? The current history will be deleted.")) {
+      setChatHistories(prev => {
+        const bot = bots.find(b => b.id === botId);
+        const newHistory = bot?.scenario 
+          ? [{ id: `bot-reset-${Date.now()}`, text: bot.scenario, sender: 'bot' as const, timestamp: Date.now() }] 
+          : [];
+        return { ...prev, [botId]: newHistory };
+      });
+    }
+  };
+
   const handleClearData = () => {
       if (window.confirm("Are you sure you want to delete all your bots, personas, and chat history? This cannot be undone.")) {
         setBots([]);
@@ -209,6 +226,8 @@ const App: React.FC = () => {
         return <CreationForm onSaveBot={handleSaveBot} onNavigate={handleNavigate} botToEdit={botToEdit} />;
       case 'images':
         return <ImageGeneratorPage />;
+      case 'scenario':
+        return <ScenarioGeneratorPage personas={personas} />;
       case 'personas':
         return <PersonasPage personas={personas} bots={bots} onSave={handleSavePersona} onDelete={handleDeletePersona} onAssign={handleAssignPersona} />;
       case 'chat':
@@ -221,6 +240,8 @@ const App: React.FC = () => {
                     onUpdateHistory={(newHistory) => handleUpdateHistory(effectiveBot.id, newHistory)}
                     selectedAI={selectedAI}
                     voicePreference={voicePreference}
+                    onEdit={handleEditBot}
+                    onStartNewChat={handleStartNewChat}
                  />;
         }
         setCurrentPage('home');

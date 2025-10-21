@@ -108,7 +108,7 @@ export const generateUserResponseSuggestion = (
     personality: string, 
     selectedAI: AIModelOption
 ) => generateTextWithFallback(
-    () => `You are helping a user write a response in a chat. Based on the bot's personality and the last few messages, suggest a short, natural, human-like reply from the USER'S perspective. Bot's personality for context: "${personality}"`,
+    () => `You are helping a user write a response in a chat. Based on the bot's personality and the last few messages, suggest a short, natural, human-like reply from the USER'S perspective. The response should be simple, realistic, and sound like something a real person would type in a chat. Avoid clichés or overly formal language. Bot's personality for context: "${personality}"`,
     history, 
     selectedAI
 );
@@ -126,6 +126,44 @@ export async function generateDynamicDescription(personality: string): Promise<s
     // Graceful fallback to static description if API fails
     return "I'm ready to chat.";
   }
+}
+
+export async function generateScenario(personaPersonality: string, userPrompt: string): Promise<string> {
+  const fullPrompt = `You are a creative writer tasked with starting a roleplay chat.
+- The bot's personality is: "${personaPersonality}"
+- The user has provided an optional theme/idea: "${userPrompt || 'None'}"
+
+Based on this, write a simple, creative, and engaging opening message (a "scenario") from the bot's point of view. The message should set a scene or start a conversation. It must be written in a human-like, first-person style. Keep it concise (2-4 sentences). Do not use quotation marks for the whole message, but you can use them for dialogue within the message. For example, instead of "*I look at you and say "hi"*", it should be something like "I look over at you, a small smile playing on my lips. 'Hi there,' I say softly."`;
+
+  const modelsToTry: AIModelOption[] = ['gemini', 'qwen', 'deepseek'];
+
+  for (const model of modelsToTry) {
+      try {
+          if (model === 'gemini') {
+              console.log("Attempting to generate scenario with Gemini...");
+              const response = await ai.models.generateContent({
+                  model: 'gemini-2.5-flash',
+                  contents: fullPrompt,
+              });
+              return response.text.trim(); // Success, return immediately
+          } else {
+              console.log(`Attempting to generate scenario with OpenRouter model: ${model}`);
+              const openRouterModelKey = model as Exclude<AIModelOption, 'gemini'>;
+              const openRouterModel = modelMap[openRouterModelKey];
+              if (!openRouterModel) continue;
+
+              const response = await callOpenRouter(openRouterModel, fullPrompt, []);
+              return response.trim(); // Success, return immediately
+          }
+      } catch (error) {
+          console.warn(`Error generating scenario with ${model}:`, error);
+          // If this is not the last model, the loop will continue to the next one.
+      }
+  }
+
+  // If all models have failed, return the final fallback message.
+  console.error("All AI models failed to generate a scenario.");
+  return "Sorry, I couldn't come up with a scenario right now. Please try again.";
 }
 
 export async function generateImage(prompt: string, sourceImage: string | null): Promise<string> {

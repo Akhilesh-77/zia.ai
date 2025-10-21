@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AIModelOption, VoicePreference } from '../types';
 
 interface SettingsPanelProps {
@@ -11,7 +11,7 @@ interface SettingsPanelProps {
   selectedAI: AIModelOption;
   onSelectAI: (model: AIModelOption) => void;
   voicePreference: VoicePreference | null;
-  onSetVoicePreference: (voice: VoicePreference) => void;
+  onSetVoicePreference: (voice: VoicePreference | null) => void;
 }
 
 const aiModelOptions: { id: AIModelOption, name: string }[] = [
@@ -22,6 +22,24 @@ const aiModelOptions: { id: AIModelOption, name: string }[] = [
 ];
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, toggleTheme, onClearData, selectedAI, onSelectAI, voicePreference, onSetVoicePreference }) => {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  useEffect(() => {
+    const loadVoices = () => {
+        const availableVoices = window.speechSynthesis.getVoices();
+        if(availableVoices.length > 0) {
+            setVoices(availableVoices);
+        }
+    };
+    loadVoices();
+    // Voices might load asynchronously.
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+    return () => {
+        window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   return (
     <>
       <div 
@@ -50,10 +68,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose, theme, t
                  <div className="bg-white/5 dark:bg-black/10 p-4 rounded-xl">
                     <p className="font-medium mb-2">Voice Preference</p>
                     <p className="text-xs text-gray-400 mb-3">Select the default voice for text-to-speech.</p>
-                    <div className="flex gap-2">
-                        <button onClick={() => onSetVoicePreference('female')} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${voicePreference === 'female' ? 'bg-accent text-white' : 'bg-black/20'}`}>Female</button>
-                        <button onClick={() => onSetVoicePreference('male')} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${voicePreference === 'male' ? 'bg-accent text-white' : 'bg-black/20'}`}>Male</button>
-                    </div>
+                    {voices.length > 0 ? (
+                        <select
+                            value={voicePreference || ''}
+                            onChange={(e) => onSetVoicePreference(e.target.value || null)}
+                            className="w-full bg-black/20 p-2 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-accent"
+                        >
+                            <option value="">Browser Default</option>
+                            {voices.map(voice => (
+                                <option key={voice.name} value={voice.name}>
+                                    {voice.name} ({voice.lang})
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <p className="text-xs text-gray-400">Loading voices...</p>
+                    )}
                 </div>
 
                 <div className="bg-white/5 dark:bg-black/10 p-4 rounded-xl">

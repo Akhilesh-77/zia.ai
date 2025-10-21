@@ -1,6 +1,6 @@
 
 export type AIModelOption = 'gemini' | 'zia' | 'deepseek' | 'qwen';
-export type VoicePreference = 'male' | 'female';
+export type VoicePreference = string;
 
 export interface BotProfile {
   id: string;

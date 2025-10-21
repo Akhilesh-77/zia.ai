@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { BotProfile } from '../types';
+import ImageCropper from './ImageCropper';
 
 interface CreationPageProps {
   onSaveBot: (profile: Omit<BotProfile, 'id'> | BotProfile) => void;
@@ -15,6 +16,7 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
   const [gif, setGif] = useState<string | null>(null);
   const [scenario, setScenario] = useState('');
   const [chatBackground, setChatBackground] = useState<string | null>(null);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
 
   const isEditing = !!botToEdit;
 
@@ -30,11 +32,18 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
     }
   }, [botToEdit, isEditing]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<string | null>>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'photo' | 'gif' | 'background') => {
     if (e.target.files && e.target.files[0]) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setter(event.target?.result as string);
+        const result = event.target?.result as string;
+         if (fileType === 'background') {
+            setImageToCrop(result); // Open cropper modal
+        } else if (fileType === 'photo') {
+            setPhoto(result);
+        } else {
+            setGif(result);
+        }
       };
       reader.readAsDataURL(e.target.files[0]);
     }
@@ -62,6 +71,16 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
 
   return (
     <div className="h-full w-full flex flex-col p-4 bg-light-bg text-light-text dark:bg-dark-bg dark:text-dark-text">
+       {imageToCrop && (
+            <ImageCropper 
+                imageSrc={imageToCrop}
+                onClose={() => setImageToCrop(null)}
+                onCropComplete={(croppedImage) => {
+                    setChatBackground(croppedImage);
+                    setImageToCrop(null);
+                }}
+            />
+        )}
       <header className="flex items-center mb-6 text-center">
         <h1 className="text-xl font-bold flex-1">{isEditing ? 'Edit Bot' : 'Create New Bot'}</h1>
       </header>
@@ -70,7 +89,7 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
         <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="photo-upload" className={labelClass}>Bot Photo *</label>
-              <input id="photo-upload" type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setPhoto)} className="hidden" />
+              <input id="photo-upload" type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'photo')} className="hidden" />
               <label htmlFor="photo-upload" className="cursor-pointer block w-full h-32 bg-white/5 dark:bg-black/5 rounded-2xl border-2 border-dashed border-white/20 dark:border-black/20 flex items-center justify-center">
                 {photo ? (
                   <img src={photo} alt="Bot preview" className="h-full w-full object-contain rounded-2xl" />
@@ -81,7 +100,7 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
             </div>
             <div>
               <label htmlFor="gif-upload" className={labelClass}>Bot GIF</label>
-              <input id="gif-upload" type="file" accept="image/gif" onChange={(e) => handleFileUpload(e, setGif)} className="hidden" />
+              <input id="gif-upload" type="file" accept="image/gif" onChange={(e) => handleFileUpload(e, 'gif')} className="hidden" />
               <label htmlFor="gif-upload" className="cursor-pointer block w-full h-32 bg-white/5 dark:bg-black/5 rounded-2xl border-2 border-dashed border-white/20 dark:border-black/20 flex items-center justify-center">
                 {gif ? (
                   <img src={gif} alt="GIF preview" className="h-full w-full object-contain rounded-2xl" />
@@ -93,7 +112,7 @@ const CreationPage: React.FC<CreationPageProps> = ({ onSaveBot, onNavigate, botT
         </div>
         <div>
            <label htmlFor="background-upload" className={labelClass}>Chat Background (9:16)</label>
-            <input id="background-upload" type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setChatBackground)} className="hidden" />
+            <input id="background-upload" type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'background')} className="hidden" />
             <label htmlFor="background-upload" className="cursor-pointer block w-full h-48 bg-white/5 dark:bg-black/5 rounded-2xl border-2 border-dashed border-white/20 dark:border-black/20 flex items-center justify-center">
                 {chatBackground ? (
                     <img src={chatBackground} alt="Background preview" className="h-full w-full object-cover rounded-2xl" />
