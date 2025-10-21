@@ -244,7 +244,7 @@ const App: React.FC = () => {
       case 'images':
         return <ImageGeneratorPage />;
       case 'scenario':
-        return <ScenarioGeneratorPage personas={personas} />;
+        return <ScenarioGeneratorPage personas={personas} selectedAI={selectedAI} />;
       case 'personas':
         return <PersonasPage personas={personas} bots={bots} onSave={handleSavePersona} onDelete={handleDeletePersona} onAssign={handleAssignPersona} />;
       case 'chat':

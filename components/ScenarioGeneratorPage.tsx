@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import type { Persona } from '../types';
+import type { Persona, AIModelOption } from '../types';
 import { generateScenario } from '../services/geminiService';
 
 interface ScenarioGeneratorPageProps {
   personas: Persona[];
+  selectedAI: AIModelOption;
 }
 
-const ScenarioGeneratorPage: React.FC<ScenarioGeneratorPageProps> = ({ personas }) => {
+const ScenarioGeneratorPage: React.FC<ScenarioGeneratorPageProps> = ({ personas, selectedAI }) => {
     const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
     const [userPrompt, setUserPrompt] = useState('');
     const [generatedScenario, setGeneratedScenario] = useState('');
@@ -23,7 +24,7 @@ const ScenarioGeneratorPage: React.FC<ScenarioGeneratorPageProps> = ({ personas 
         setGeneratedScenario('');
         setCopySuccess('');
         try {
-            const scenario = await generateScenario(selectedPersona.personality, userPrompt);
+            const scenario = await generateScenario(selectedPersona.personality, userPrompt, selectedAI);
             setGeneratedScenario(scenario);
         } catch (error) {
             console.error(error);
