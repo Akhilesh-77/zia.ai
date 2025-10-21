@@ -129,11 +129,11 @@ const ChatView: React.FC<ChatViewProps> = ({ bot, onBack, chatHistory, onNewMess
   const handleBuildMessage = async () => {
       setIsTyping(true);
       try {
-          const suggestion = await generateUserResponseSuggestion(chatHistory, bot.personality, selectedAI);
+          const suggestion = await generateUserResponseSuggestion(chatHistory, bot.personality);
           setInput(suggestion.replace(/"/g, '')); // Remove quotes from suggestions
       } catch (error) {
           console.error("Failed to build message suggestion:", error);
-          setInput("Sorry, couldn't think of anything right now.");
+          setInput("Sorry, an unexpected error occurred.");
       } finally {
           setIsTyping(false);
       }

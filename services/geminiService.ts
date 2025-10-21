@@ -104,15 +104,54 @@ export const generateBotResponse = (
     selectedAI: AIModelOption
 ) => generateTextWithFallback(() => personality, history, selectedAI);
 
-export const generateUserResponseSuggestion = (
+export const generateUserResponseSuggestion = async (
     history: ChatMessage[], 
-    personality: string, 
-    selectedAI: AIModelOption
-) => generateTextWithFallback(
-    () => `You are helping a user write a response in a chat. Based on the bot's personality and the last few messages, suggest a short, natural, human-like reply from the USER'S perspective. The response should be simple, realistic, and sound like something a real person would type in a chat. Avoid clichés or overly formal language. Bot's personality for context: "${personality}"`,
-    history, 
-    selectedAI
-);
+    personality: string,
+): Promise<string> => {
+    const systemPrompt = `You are helping a user write a response in a chat. Based on the bot's personality and the last few messages, suggest a short, natural, human-like reply from the USER'S perspective. The response should be simple, realistic, and sound like something a real person would type in a chat. Avoid clichés or overly formal language. Bot's personality for context: "${personality}"`;
+
+    const fallbackModels = [
+        'qwen/qwen2.5-vl-32b-instruct:free',
+        'qwen/qwen2.5-vl-72b-instruct:free',
+        'google/gemma-3-4b-it:free',
+        'google/gemini-2.0-flash-exp:free'
+    ];
+
+    // Try Gemini first
+    try {
+        console.log("Attempting to generate user suggestion with Gemini...");
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: history.map(msg => ({
+                role: msg.sender === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.text }]
+            })),
+            config: { systemInstruction: systemPrompt },
+        });
+        const text = response.text.trim();
+        if (text) return text;
+        throw new Error("Gemini returned an empty response.");
+    } catch (err) {
+        console.warn("Gemini suggestion failed, initiating fallback sequence:", err);
+    }
+
+    // Fallback to OpenRouter models
+    for (const model of fallbackModels) {
+        try {
+            console.log(`Attempting user suggestion with OpenRouter model: ${model}`);
+            const response = await callOpenRouter(model, systemPrompt, history);
+            const text = response.trim();
+            if (text) return text;
+            throw new Error("OpenRouter returned an empty response.");
+        } catch (error) {
+            console.warn(`Error generating suggestion with ${model}:`, error);
+        }
+    }
+    
+    // Final fallback if all else fails
+    console.error("All AI models failed to generate a user suggestion.");
+    return "Hey cutie 😚 I’m thinking... give me a sec 💭";
+};
 
 
 export async function generateDynamicDescription(personality: string): Promise<string> {
@@ -139,9 +178,9 @@ Based on this, write a simple, creative, and engaging opening message (a "scenar
   const modelsToTry = [
     'gemini',
     'qwen/qwen2.5-vl-32b-instruct:free',
+    'qwen/qwen2.5-vl-72b-instruct:free',
     'google/gemma-3-4b-it:free',
-    'google/gemini-2.0-flash-exp:free',
-    'qwen/qwen2.5-vl-72b-instruct:free'
+    'google/gemini-2.0-flash-exp:free'
   ];
 
   for (const model of modelsToTry) {
@@ -170,7 +209,7 @@ Based on this, write a simple, creative, and engaging opening message (a "scenar
 
   // If all models have failed, return the final fallback message.
   console.error("All AI models failed to generate a scenario.");
-  return "Hey there 👋! Let’s dive into something fun!";
+  return "Hey there 👋! I was just thinking about you! What should we talk about today?";
 }
 
 async function generateImageWithOpenRouter(prompt: string): Promise<string> {
